@@ -1,5 +1,5 @@
 """Step 7: Dagster calls the SAME pipeline as the CLI, avoiding divergent logic."""
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import dagster as dg
 
@@ -36,8 +36,10 @@ job = dg.define_asset_job("daily_carbon_report", selection=dg.AssetSelection.ass
 
 
 @dg.schedule(job=job, cron_schedule="15 6 * * *", execution_timezone="Europe/Copenhagen")
-def daily_schedule():
-    yesterday = datetime.now(COPENHAGEN).date() - timedelta(days=1)
+def daily_schedule(context: dg.ScheduleEvaluationContext):
+    scheduled_time = context.scheduled_execution_time
+    # Delayed ticks must retain their original Danish reporting day.
+    yesterday = scheduled_time.astimezone(COPENHAGEN).date() - timedelta(days=1)
     return dg.RunRequest(partition_key=yesterday.isoformat())
 
 
