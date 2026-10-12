@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: grid
+      POSTGRES_PASSWORD: grid
+      POSTGRES_DB: grid
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grid"]
+      interval: 3s
+      retries: 20
+  api:
+    build: .
+    environment: &environment
+      DATABASE_URL: postgresql://grid:grid@db:5432/grid
+      RAW_DIR: /app/data/raw
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["raw_data:/app/data"]
+  dagster:
+    build: .
+    environment: *environment
+    command: ["dagster", "dev", "-m", "grid_report.definitions", "-h", "0.0.0.0", "-p", "3000"]
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:3000:3000"]
+    volumes: ["raw_data:/app/data", "dagster_data:/app/.dagster"]
+volumes:
+  postgres_data:
+  raw_data:
+  dagster_data:

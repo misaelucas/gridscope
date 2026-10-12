@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grid-report"
+version = "0.1.0"
+description = "A learning-focused Danish electricity carbon-intensity reporting pipeline"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.28,<1", "psycopg[binary]>=3.2,<4", "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "dagster>=1.10,<2", "dagster-webserver>=1.10,<2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+
+[project.scripts]
+grid-report = "grid_report.cli:main"
+
+[tool.setuptools.package-data]
+grid_report = ["sql/*.sql", "static/*", "static/fonts/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

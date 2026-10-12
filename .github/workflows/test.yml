@@ -1,0 +1,22 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: {POSTGRES_USER: grid, POSTGRES_PASSWORD: grid, POSTGRES_DB: grid_test}
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U grid" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://grid:grid@localhost:55432/grid_test
+      GRID_TEST_DATABASE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements.lock.txt && pip install --no-deps -e '.[dev]'
+      - run: ruff check .
+      - run: pytest -q

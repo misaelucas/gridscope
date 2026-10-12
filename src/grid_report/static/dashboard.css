@@ -1,0 +1,61 @@
+/* Layout reference: bottenmisa Layout.astro + PortfolioPage.astro.
+   Theme tokens live in theme.css; dashboard rules consume those tokens. */
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--body-900); color: var(--text-800); font-family: var(--font-family-sans); }
+html.dark, html.dark body { background: #02020a; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(148 163 184 / 0.05)'><path d='M0 .5H31.5V32'/></svg>");
+  mask-image: linear-gradient(0deg, transparent, black);
+}
+.report-page { position: relative; width: min(100%, 86rem); padding: 0 2rem; margin: clamp(2.5rem, 6vw, 5rem) auto 5rem; }
+header { margin-bottom: 3.2rem; }
+.eyebrow, .section-number { color: var(--text-400); font-size: .78rem; line-height: 1.5; }
+.eyebrow { margin: 0; }
+h1, h2 { color: var(--text-900); }
+h1 { margin: .9rem 0 1.25rem; font-size: clamp(3rem, 6vw, 4.5rem); font-weight: 900; line-height: 1; letter-spacing: -.045em; }
+h2 { margin: .55rem 0 1.2rem; font-size: clamp(1.5rem, 3.5vw, 2rem); font-weight: 500; line-height: 1.25; letter-spacing: -.035em; }
+p { line-height: 1.75; }
+.description { max-width: 70ch; margin: 0; color: var(--text-700); }
+.detail { max-width: 70ch; color: var(--text-300); font-size: .85rem; }
+form { display: flex; align-items: end; flex-wrap: wrap; gap: 1.25rem; margin: 2rem 0; }
+label { display: grid; gap: .6rem; color: var(--text-400); font-size: .8rem; }
+button, input { font: inherit; color: var(--text-800); background: transparent; border: 1px solid var(--divider); padding: .65rem .85rem; border-radius: 0; }
+input { font-size: 1rem; }
+button { cursor: pointer; font-size: .85rem; }
+button:hover { border-color: var(--brand-500); color: var(--brand-500); }
+:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 5px; }
+#cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--divider); }
+.region { min-width: 0; padding: 2rem 0; }
+.region + .region { padding-left: 3rem; }
+.region h2 { font-size: .85rem; color: var(--text-400); letter-spacing: 0; }
+.value { color: var(--text-900); font-size: clamp(1.65rem, 3vw, 2.4rem); font-weight: 500; letter-spacing: -.035em; }
+.region p { color: var(--text-500); font-size: .85rem; margin: .7rem 0; }
+.region small { color: var(--text-300); font-size: .75rem; }
+.region .warning, #error { color: var(--highlight); }
+.report-section { display: grid; grid-template-columns: minmax(12rem, .45fr) minmax(0, 1fr); gap: clamp(2rem, 4vw, 4rem); padding: 3rem 0; border-top: 1px solid var(--divider); }
+.section-heading p { margin: 0; }
+.section-content { min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 0 0 1.5rem; font-size: .8rem; color: var(--text-400); }
+.legend span::before { content: ""; display: inline-block; width: 1.2rem; margin-right: .5rem; vertical-align: middle; border-top: 2px solid var(--series-dk1); }
+.legend .dk2::before { border-color: var(--series-dk2); }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; font-size: .8rem; font-variant-numeric: tabular-nums; }
+th { font-weight: 500; color: var(--text-400); }
+th, td { padding: .85rem .75rem .85rem 0; border-bottom: 1px solid var(--divider); white-space: nowrap; }
+td { color: var(--text-600); }
+a { color: var(--brand-500); text-decoration: underline; text-underline-offset: .3em; }
+a:hover { color: var(--text-900); }
+footer { border-top: 1px solid var(--divider); padding-top: 1.5rem; }
+@media (max-width: 900px) { .report-section { grid-template-columns: 1fr; gap: .75rem; } }
+@media (max-width: 600px) {
+  .report-page { padding-inline: 1.25rem; }
+  header { margin-bottom: 2rem; }
+  #cards { grid-template-columns: 1fr; }
+  .region + .region { padding-left: 0; border-top: 1px solid var(--divider); }
+  .report-section { padding-block: 2rem; }
+}

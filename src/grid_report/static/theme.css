@@ -1,0 +1,61 @@
+/* Adapted from bottenmisa/src/styles/theme.css. Keep token names and values aligned. */
+:root {
+  --font-family-sans: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --divider: rgb(148 163 184 / 0.2);
+  --series-dk1: var(--brand-500);
+  --series-dk2: #a78bfa;
+}
+html {
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  --highlight: #15803d;
+  --brand-100: #dcfce7;
+  --brand-rgb-900: 22 163 74;
+  --brand-900: rgb(var(--brand-rgb-900));
+  --brand-500: #16a34a;
+  --body-200: hsl(225 21% 69%);
+  --body-300: hsl(225 21% 73%);
+  --body-400: hsl(225 21% 79%);
+  --body-500: hsl(225 21% 83%);
+  --body-600: hsl(225 21% 88%);
+  --body-700: hsl(225 21% 93%);
+  --body-800: hsl(225 21% 96%);
+  --body-900: hsl(225 21% 99%);
+  --text-100: hsl(225 8% 48%);
+  --text-200: hsl(225 8% 40%);
+  --text-300: hsl(225 8% 34%);
+  --text-400: hsl(225 8% 27%);
+  --text-500: hsl(225 8% 21%);
+  --text-600: hsl(225 8% 17%);
+  --text-700: hsl(225 8% 13%);
+  --text-800: hsl(225 8% 10%);
+  --text-900: hsl(225 8% 5%);
+}
+html.dark {
+  color-scheme: dark;
+  --brand-rgb-100: 15 17 23;
+  --brand-100: #052e16;
+  --brand-rgb-900: 34 197 94;
+  --brand-900: rgb(var(--brand-rgb-900));
+  --brand-500: #22c55e;
+  --highlight: #86efac;
+  --body-100: hsl(225 21% 35%);
+  --body-200: hsl(225 21% 30%);
+  --body-300: hsl(225 21% 26%);
+  --body-400: hsl(225 21% 23%);
+  --body-500: hsl(225 21% 19%);
+  --body-600: hsl(225 21% 16%);
+  --body-700: hsl(225 21% 12%);
+  --body-800: hsl(225 21% 9%);
+  --body-900: hsl(225 21% 7%);
+  --text-900: hsl(0 0% 100%);
+  --text-800: hsl(223 23% 94%);
+  --text-700: hsl(226 21% 88%);
+  --text-600: hsl(227 21% 83%);
+  --text-500: hsl(225 21% 78%);
+  --text-400: hsl(226 21% 73%);
+  --text-300: hsl(225 21% 68%);
+  --text-200: hsl(225 21% 61%);
+  --text-100: hsl(224 21% 53%);
+}
