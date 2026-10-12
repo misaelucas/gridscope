@@ -22,9 +22,16 @@ At that date, 22:00 UTC is midnight in Copenhagen, so the observation belongs to
 
 Each page is written to disk before normalization. If upstream changes a field, the original response survives for investigation. A run UUID prevents the next attempt from overwriting that evidence.
 
-Read the nested loops: the outer loop advances pages; the inner loop retries one request. Retries use exponential delay and respect numeric Retry-After values. Permanent HTTP client errors should not be retried. Pagination sorts by the complete observation identity so page ordering is stable where the source data are stable.
+Read the nested loops: the outer loop advances pages; the inner loop retries one request.
+Retries use exponential delay and accept numeric or HTTP-date Retry-After values, capped at
+30 seconds per delay and a shared 60-second sleep budget. Failure diagnostics retain status
+and attempt information without bodies or headers. Permanent HTTP client errors are not retried.
+Pagination sorts by the complete observation identity so page ordering is stable where the
+source data are stable.
 
-**Try:** open `tests/test_source.py`. Trace the offsets `[0, 1]` when page size is one. Add a test showing a 429 response retries. What happens if the server always returns a full page? What snapshot guarantee is still missing?
+**Try:** open `tests/test_source.py`. Trace the offsets `[0, 1]` when page size is one.
+Follow the 429 retry and shared waiting-budget tests. What happens if the server always returns
+a full page? What snapshot guarantee is still missing?
 
 ## 3. Define storage rules — `sql/schema.sql`, then `db.py`
 

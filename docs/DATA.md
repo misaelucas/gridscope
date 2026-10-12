@@ -33,3 +33,15 @@ Report averages are unweighted averages of available five-minute readings. They 
 ## Pagination and concurrent updates
 
 Requests sort by UTC timestamp and region, advance offset and stop on a short page. The upstream `total` is not used as a reliable count of all matching rows. A 20-page cap bounds work. Historical complete-day imports reduce moving-window problems, but the API does not supply snapshot isolation. Duplicate keys are rejected rather than silently selecting an arbitrary version. Retries apply to transport failures, HTTP 429 and 5xx; other 4xx fail immediately.
+
+Each page allows at most four attempts. Retry waits use exponential backoff and accept
+`Retry-After` delta-seconds or HTTP dates. Missing, invalid, negative or past values fall back
+to backoff. Each delay is capped at 30 seconds; all pages share a 60-second cumulative sleep
+budget per daily fetch. Once that budget is exhausted, the next failure is raised without
+retrying. These bounds cover requested retry sleeps, not total HTTP or filesystem execution time.
+
+Successful HTTP responses retain their exact raw bytes, including malformed payloads for
+diagnosis. Failed HTTP attempts produce separate `failure-PAGE-ATTEMPT.json` diagnostics with
+only page, attempt and status code. Transport failures use a boolean flag instead of the exception
+message. Failure bodies, URLs and request/response headers are deliberately omitted because they
+may contain or echo secrets. Payload-shape and JSON errors fail immediately without retries.
