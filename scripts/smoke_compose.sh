@@ -88,6 +88,7 @@ PY
 
 "${compose[@]}" exec -T api python - <<'PY'
 from importlib.resources import files
+from html.parser import HTMLParser
 import time
 import httpx
 
@@ -97,7 +98,32 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=5) as client:
         response.raise_for_status()
         return response
 
-    assert "GridScope" in get("/").text
+    html = get("/").text
+    assert "GridScope" in html and 'id="root"' in html
+    class Assets(HTMLParser):
+        paths = []
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "script" and attrs.get("type") == "module":
+                self.paths.append((attrs["src"], "javascript"))
+            if tag == "link" and attrs.get("rel") == "stylesheet":
+                self.paths.append((attrs["href"], "text/css"))
+    assets = Assets()
+    assets.feed(html)
+    assert {kind for _, kind in assets.paths} == {"javascript", "text/css"}
+    # Include lazy chart chunks as well as entry points referenced by index.html.
+    for asset in files("grid_report").joinpath("static/spa/assets").iterdir():
+        if asset.name.endswith((".js", ".css")):
+            path = f"/static/spa/assets/{asset.name}"
+            if path not in {path for path, _ in assets.paths}:
+                assets.paths.append((path, "javascript" if asset.name.endswith(".js") else "text/css"))
+    for path, kind in assets.paths:
+        assert path.startswith("/static/spa/assets/") and ".." not in path
+        response = get(path)
+        assert kind in response.headers["content-type"] and response.content
+        assert response.content == files("grid_report").joinpath(path.removeprefix("/")).read_bytes()
+    assert "/static/app.js" not in html
+    assert client.get("/static/app.js").status_code == 404
     report = get("/api/reports?day=2026-10-10").json()
     assert report["day"] == "2026-10-10"
     assert report["timezone"] == "Europe/Copenhagen"
@@ -112,19 +138,12 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=5) as client:
         assert len(series["observations"]) == 288
         assert all(row["intensity"] is None for row in series["observations"])
     assert get("/api/runs").json() == []
-    for asset, content_type in [
-        ("fonts.css", "text/css"), ("theme.css", "text/css"),
-        ("dashboard.css", "text/css"), ("app.js", "javascript"),
-        *[(f"fonts/hanken-grotesk-{weight}.ttf", "font/ttf") for weight in (400, 500, 900)],
-    ]:
+    for asset in [f"fonts/hanken-grotesk-{weight}.ttf" for weight in (400, 500, 900)]:
         response = get(f"/static/{asset}")
         assert response.content, asset
-        if asset.endswith(".ttf"):
-            # Slim images may lack the host's MIME database; verify the font itself.
-            assert response.content == files("grid_report").joinpath("static", asset).read_bytes(), asset
-        else:
-            assert content_type in response.headers["content-type"], asset
-    print("Empty reporting, series, runs and packaged assets verified.")
+        # Slim images may lack the host's MIME database; verify the font bytes.
+        assert response.content == files("grid_report").joinpath("static", asset).read_bytes(), asset
+    print("Empty reporting, series, runs, compiled SPA and packaged fonts verified.")
 
 # Verify the running webserver loaded its code location, not just an import in another process.
 with httpx.Client(timeout=2) as client:

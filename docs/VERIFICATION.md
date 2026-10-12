@@ -1,5 +1,56 @@
 # GridScope — Verification — 2026-10-12
 
+## React dashboard modernization — 2026-10-12
+
+The tracked dashboard screenshot and unchanged `fonts.css`, `theme.css` and
+`dashboard.css` supplied the visual baseline; the external bottenmisa directory
+was unavailable on Windows. React 19, TypeScript, Vite, Tailwind 4 and Recharts
+now render the dashboard, with the comparison chart spanning the full content width.
+API schemas, PostgreSQL code and ingestion semantics are unchanged. Separate API
+requests still do not share a database snapshot.
+
+Verified locally:
+
+- Windows `npm --prefix frontend test`: **27 passed across 3 files in 2.17s**.
+- Fresh Linux Node 22.23.3 `npm ci`, `npm test`: **27 passed across 3 files in 1.75s**.
+- Windows and Linux `npm run build`: TypeScript and production Vite build passed.
+  Vite leaves the three absolute font URLs for FastAPI to resolve; runtime checks
+  verified their HTTP responses and packaged bytes. The chart is a lazy JS chunk.
+- Full Python suite with Python 3.11 and a disposable PostgreSQL 17.11 database:
+  **74 passed, 1 warning in 4.47s**. The warning is the existing Starlette/httpx
+  deprecation. No development database or existing volume was used.
+- `ruff check --no-cache .`: **All checks passed**. `git diff --check`: passed.
+- Linux `bash -n scripts/smoke_compose.sh`: **exit 0**. Full isolated Compose
+  smoke: **exit 0**, including the multi-stage build, installed SPA entry point,
+  all hashed JS/CSS chunks, fonts, empty APIs, database health and Dagster.
+  Its scoped containers, network and volumes were removed.
+- Optional Playwright script using installed Windows Edge: **desktop hover and
+  mobile touch passed** at 1280×900 and 390×844. Checked repeated Copenhagen
+  02:30 timestamps with UTC+02:00 and UTC+01:00, exact DK1/DK2 readings, null
+  versus zero, full-width chart, fonts, no horizontal overflow and no page errors.
+  Synthetic API fixtures were intercepted; no real Energinet import was performed.
+
+React tests cover selection, cancellation, stale responses, failed requests,
+recovery, empty states and populated rendering. Chart tests exercise actual
+Recharts mouse/touch handling and disconnected SVG paths at nulls. Time/merge
+coverage preserves UTC ordering and all 276/288/300 DST-day slots. Browser
+coverage here uses Edge; Firefox, Safari and physical mobile devices were not tested.
+
+Linux development: `python3.11 -m venv .venv`, `source .venv/bin/activate`,
+`pip install -r requirements.lock.txt`, `pip install --no-deps -e '.[dev]'`,
+`npm --prefix frontend ci`, then `npm --prefix frontend run dev` alongside
+`uvicorn grid_report.api:app --host 127.0.0.1 --port 8000`.
+Windows PowerShell: `py -3.11 -m venv .venv`,
+`.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt`,
+`.\.venv\Scripts\python.exe -m pip install --no-deps -e '.[dev]'`,
+`npm --prefix frontend ci`, then `npm --prefix frontend run dev` alongside
+`.\.venv\Scripts\python.exe -m uvicorn grid_report.api:app --host 127.0.0.1 --port 8000`.
+Both use Vite at `http://127.0.0.1:5173`, with API/font proxying to port 8000.
+Run `npm --prefix frontend run build` before serving the production root or
+building a Python wheel. README contains the database setup and test commands.
+Native Windows Compose smoke was not run; Docker smoke used Linux containers.
+Remote CI for this change must be checked independently after pushing.
+
 ## Shell checkout portability — 2026-10-12
 
 Windows Git had `core.autocrlf=true`, no attributes rule, and an LF index blob but CRLF

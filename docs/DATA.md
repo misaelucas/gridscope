@@ -60,6 +60,15 @@ an error. Failed loads clear all dependent displays. Default yesterday is calcul
 finding today's Copenhagen calendar date and then subtracting one calendar day, including
 DST boundaries. Selection alone does not fetch, and the dashboard does not poll the source.
 
+The React chart merges DK1 and DK2 by the numeric UTC instant of each timestamp, takes
+the union of slots and sorts chronologically. Missing region readings remain null;
+all expected 276/288/300 five-minute slots are retained. The numeric time axis does not
+collapse the repeated autumn local clock labels. Lines are linear between adjacent valid
+observations and never bridge null slots. Hover/touch/keyboard tooltips show the full
+Copenhagen date and time (including seconds), explicit UTC offset, both region readings
+and g CO₂/kWh. Tooltip numbers retain their API precision; summary cards round to one
+decimal as before. This is a presentation change, not interpolation or energy weighting.
+
 ## Pagination and concurrent updates
 
 Database updates for the same Danish local day are serialized using a PostgreSQL

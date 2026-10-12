@@ -23,3 +23,6 @@ data/
 .dagster/
 build/
 dist/
+node_modules/
+src/grid_report/static/spa/
+frontend/browser-artifacts/

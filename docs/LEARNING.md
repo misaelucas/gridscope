@@ -89,7 +89,7 @@ Read each common table expression (CTE) in order:
 
 **Try:** temporarily remove the LEFT JOIN and explain which reports become misleading. Restore it. Add a SQL metric for intervals over a chosen intensity threshold and define whether the denominator is observed or expected intervals.
 
-## 6. Serve useful results — `api.py`, then `static/app.js`
+## 6. Serve useful results — `api.py`, then `frontend/src/`
 
 FastAPI converts query parameters to typed dates and validates region names. Ordinary `def` endpoints perform blocking database work in FastAPI's thread pool. They read stored data; dashboard visitors never cause source downloads.
 
@@ -100,7 +100,7 @@ offset-aware timestamps, UUIDs and run statuses. PostgreSQL integration tests in
 populated HTTP responses, not only database helper results: they distinguish zero from
 null, verify region/series/history ordering and exercise both DST day lengths.
 
-`app.js` aborts the previous request group and increments a request ID on a new load or
+`App.tsx` aborts the previous request group and increments a request ID on a new load or
 date edit. It clears cards, chart and history immediately. Before rendering or reporting
 an error it checks that the ID and selected date still match; cancellation is quiet.
 The ID check also protects against responses that finish despite cancellation. Date edits
@@ -109,12 +109,19 @@ the separate endpoints still read independent database snapshots.
 
 Default yesterday first extracts today's calendar date in Europe/Copenhagen, then uses
 UTC calendar arithmetic on that date. Subtracting 24 elapsed hours from the current
-instant can select the wrong day around DST. Run `node --test tests/dashboard.test.cjs`
-with Node.js 22+ to exercise the shipped script using a small DOM fixture and controlled
-fetch promises. No npm packages are required. Tests cover stale responses, cancellation,
-HTTP/network/JSON failures, recovery, empty/populated rendering, gaps/zeros and calendar
-boundaries. These are state tests, not full-browser layout or visual checks. CI runs them
-alongside the Python suite; the design and CSS are unchanged.
+instant can select the wrong day around DST. `time.ts` centralizes calendar dates and
+offset-aware Copenhagen labels. `api.ts` joins the two series by UTC instants; repeated
+clock labels stay distinct. `CarbonChart.tsx` uses Recharts with null gaps and a custom
+tooltip. Components in `Report.tsx` share the date picker, summaries, sections and history.
+
+Run `npm ci`, `npm test` and `npm run build` inside `frontend/` with Node 22.12+.
+Vitest and React Testing Library exercise stale requests, failures/recovery, rendering,
+zero/null, 276/288/300 slots and real Recharts hover/touch events. The optional
+`frontend/scripts/browser-check.cjs` uses an available Playwright/browser installation
+against `GRID_BROWSER_URL` (default API port 8000); `GRID_BROWSER_EXECUTABLE` can select
+a system browser. It intercepts all API requests with synthetic observations, checks
+desktop hover/mobile taps and writes ignored screenshots to `frontend/browser-artifacts`.
+No real source ingestion occurs in these tests.
 
 **Try:** visit `/docs`, request an invalid date and inspect the 422 response. Request a day with no data: both regions should show no average and 0% completeness. Explain why stale data can still be useful if its timestamp is visible.
 
@@ -125,9 +132,18 @@ The dashboard follows `/home/misa/repositorios/bottenmisa`, the user's required 
 - `static/fonts.css`: local Hanken Grotesk, the same family and 400/500/900 weights as `BaseHead.astro`.
 - `static/theme.css`: the original `--body-*`, `--text-*`, and `--brand-*` token names and values from `src/styles/theme.css`, with unrelated article/chat styles omitted.
 - `static/dashboard.css`: page width, typographic scale, thin dividers, subtle grid and responsive spacing adapted from `Layout.astro` and `PortfolioPage.astro`.
-- `static/app.js`: SVG colors read the CSS tokens with `getComputedStyle` so graph and page share one palette.
+- `frontend/src/styles.css`: imports these three tracked CSS files and Tailwind utilities,
+  without a preflight reset; only the full-width comparison and tooltip rules are added.
+- `frontend/src/components/CarbonChart.tsx`: SVG colors use the same CSS tokens, so graph
+  and page share one palette. The tracked screenshot remains the visual baseline.
 
 **Try:** change a series token in `theme.css` and reload. Both the legend and chart should change together. Add a metric using the existing typography and divider rules rather than creating a separate card style.
+
+Vite proxies the read-only endpoints and fonts during development. Its production base is
+`/static/spa/`; the build copies hashed assets and HTML into the ignored Python static
+package directory. Docker builds them in Node 22 before installing Python, and package-data
+includes the generated entry point/chunks plus the existing fonts. The smoke test inspects
+compiled HTML and fetches every generated JS/CSS chunk and packaged font.
 
 ## 7. Orchestrate existing logic — `definitions.py`
 

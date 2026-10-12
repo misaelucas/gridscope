@@ -1,0 +1,19 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+/* Keep the tracked bottenmisa-derived baseline; no preflight reset. */
+@import "../../src/grid_report/static/fonts.css";
+@import "../../src/grid_report/static/theme.css";
+@import "../../src/grid_report/static/dashboard.css";
+
+.comparison-section { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.carbon-chart { min-width: 0; width: 100%; font-size: .78rem; touch-action: pan-y; }
+.carbon-chart svg { height: 100%; overflow: hidden; }
+.chart-tooltip { padding: .85rem 1rem; background: #02020a; border: 1px solid var(--divider); color: var(--text-800); font-size: .8rem; }
+.chart-tooltip p { margin: 0 0 .25rem; font-variant-numeric: tabular-nums; }
+.chart-tooltip small { color: var(--text-400); }
+.chart-tooltip dl { margin: .75rem 0 0; }
+.chart-tooltip dl > div { display: flex; justify-content: space-between; gap: 1.5rem; }
+.chart-tooltip dt { color: var(--series-dk1); }
+.chart-tooltip dl > div + div dt { color: var(--series-dk2); }
+.chart-tooltip dd { margin: 0; font-variant-numeric: tabular-nums; }

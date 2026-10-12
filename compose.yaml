@@ -12,7 +12,9 @@ services:
       interval: 3s
       retries: 20
   api:
-    build: .
+    build: &build
+      context: .
+      target: runtime
     environment: &environment
       DATABASE_URL: postgresql://grid:grid@db:5432/grid
       RAW_DIR: /app/data/raw
@@ -21,7 +23,7 @@ services:
     ports: ["127.0.0.1:8000:8000"]
     volumes: ["raw_data:/app/data"]
   dagster:
-    build: .
+    build: *build
     environment: *environment
     command: ["dagster", "dev", "-m", "grid_report.definitions", "-h", "0.0.0.0", "-p", "3000"]
     depends_on:

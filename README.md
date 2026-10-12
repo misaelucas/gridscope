@@ -1,6 +1,6 @@
 # GridScope — Danish Electricity Carbon Intensity Analytics
 
-A Python + PostgreSQL reporting pipeline for Danish electricity consumption carbon intensity. Uses public Energinet CO2Emis observations for DK1 and DK2; provides daily SQL summaries, missing-data checks, a read-only FastAPI service, a dashboard and Dagster orchestration.
+A Python + PostgreSQL reporting pipeline for Danish electricity consumption carbon intensity. Uses public Energinet CO2Emis observations for DK1 and DK2; provides daily SQL summaries, missing-data checks, a read-only FastAPI service, a React dashboard and Dagster orchestration.
 
 This is a portfolio and learning project, not an operational grid-control tool. Data are preliminary estimates in **g CO₂/kWh**, not total CO₂ emissions. An arithmetic mean of five-minute intensity readings is not a consumption-weighted daily emission factor.
 
@@ -44,27 +44,72 @@ docker compose down
 
 ## Local Python development
 
+Use Python 3.11 and Node.js 22.12+ (Node 22 is used in CI and Docker).
+Run the API from the repository root. Linux/macOS:
+
 ```bash
 python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
+.venv/bin/python -m pip install -r requirements.lock.txt
+.venv/bin/python -m pip install --no-deps -e '.[dev]'
 # Run just the database in Docker:
 docker compose up -d db
 # Defaults match the Compose database. To override, export DATABASE_URL.
-grid-report init
-grid-report ingest --start 2026-10-10 --end 2026-10-11
-uvicorn grid_report.api:app --host 127.0.0.1 --port 8000
+.venv/bin/grid-report init
+.venv/bin/python -m uvicorn grid_report.api:app --host 127.0.0.1 --port 8000
 ```
 
-In another terminal, activate the environment and run `dagster dev -m grid_report.definitions`. `.env.example` documents settings; the application reads environment variables, not `.env` automatically. Never commit real credentials.
+Windows PowerShell (no activation or execution-policy changes required):
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+.\.venv\Scripts\python.exe -m pip install --no-deps -e ".[dev]"
+docker compose up -d db
+.\.venv\Scripts\grid-report.exe init
+.\.venv\Scripts\python.exe -m uvicorn grid_report.api:app --host 127.0.0.1 --port 8000
+```
+
+In a second terminal, on either platform:
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Open http://127.0.0.1:5173. Vite proxies `/api` and local font requests to FastAPI
+on port 8000. These commands initialize an empty database; they do not import live data.
+Use the explicit CLI/Compose ingestion commands above when you want source observations.
+
+For a production build served directly by FastAPI, from the repository root on either platform:
+
+```sh
+npm --prefix frontend ci
+npm --prefix frontend run build
+```
+
+The build generates ignored `frontend/dist` and `src/grid_report/static/spa` artifacts.
+Build before installing a Python wheel so it includes the SPA, or use an editable install
+locally. FastAPI `/` returns an actionable 503 until a build exists; `/api` and local
+fonts still work for Vite development. Docker's Node stage builds and packages the SPA
+automatically before Python installation. No Node runtime is required in the final image.
+
+`frontend/` uses React 19, Vite, TypeScript, Tailwind CSS 4 via `@tailwindcss/vite`,
+and Recharts. It imports the tracked Hanken Grotesk/theme/layout CSS. The full-width
+comparison chart aligns both regions by UTC instant; hover, touch and keyboard tooltips
+show Copenhagen time and its offset, both exact readings and units. Missing intervals
+break the lines; zeros remain real readings. Separate API requests are not one database snapshot.
+
+In another terminal, activate the Python environment and run `dagster dev -m grid_report.definitions`. `.env.example` documents settings; the application reads environment variables, not `.env` automatically. Never commit real credentials.
 
 ## Verification
 
 ```bash
 ruff check .
+npm --prefix frontend ci
+npm --prefix frontend test
+npm --prefix frontend run build
 pytest -q
-# Dashboard state tests: Node.js 22+; no npm installation required.
-node --test tests/dashboard.test.cjs
 ```
 
 Database tests skip unless `GRID_TEST_DATABASE=1`. Use an **isolated test database** because integration fixtures truncate this project's tables:
@@ -74,6 +119,9 @@ export DATABASE_URL=postgresql://grid:grid@localhost:55432/grid_test
 export GRID_TEST_DATABASE=1
 pytest -q
 ```
+
+On Windows PowerShell, set `$env:DATABASE_URL` and `$env:GRID_TEST_DATABASE = "1"`,
+then use `.\.venv\Scripts\python.exe -m pytest -q`. Build the frontend first.
 
 Create `grid_test` first, e.g. `docker compose exec db createdb -U grid grid_test`. GitHub Actions supplies an isolated PostgreSQL service automatically. Integration coverage includes replay, revised observations, failed imports preserving good data, SQL gaps, DST and API validation.
 
@@ -88,7 +136,8 @@ bash scripts/smoke_compose.sh
 The script builds the images and starts PostgreSQL, FastAPI and Dagster with a unique project
 name, disposable volumes and no published host ports. It checks database readiness, the
 uninitialized-schema health response, schema initialization, healthy empty reports/series,
-packaged CSS/JS/fonts, and Dagster definitions plus the running webserver's code location.
+the compiled SPA HTML, hashed CSS/JS (including the chart chunk), packaged fonts, and
+Dagster definitions plus the running webserver's code location.
 It never ingests Energinet data or enables the schedule. Cleanup removes only this disposable
 project's containers, network and volumes, including after failure or interruption; existing
 development volumes and local databases are untouched. Image/dependency downloads still need
@@ -99,9 +148,10 @@ It returns 503 with `schema: not_ready` before initialization, or `database: una
 database failures. This checks connectivity and readable schema, not migrations, write access,
 data freshness, completeness or full operational readiness.
 
-Local verification on 2026-10-12: 72 Python tests passed against disposable PostgreSQL;
-13 dashboard state tests and Ruff passed. Coverage includes populated API contracts,
-concurrent dashboard loads and Copenhagen calendar dates across DST.
+Local verification on 2026-10-12: 74 Python tests passed against disposable PostgreSQL;
+27 React/Vitest tests and Ruff passed. Windows and Linux production frontend builds
+passed, as did Compose smoke. Real Edge/Playwright desktop hover and mobile tap checks
+verified DST tooltip offsets, exact readings, zero/null and full-width responsive layout.
 GitHub Actions for ingestion commit `ecc54f1` [completed successfully](https://github.com/misaelucas/gridscope/actions/runs/38233265942).
 Compose smoke verification also passed, including image builds and container startup.
 See [verification details](docs/VERIFICATION.md) for scope and limitations.
