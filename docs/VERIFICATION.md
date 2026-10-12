@@ -1,5 +1,92 @@
 # GridScope — Verification — 2026-10-12
 
+## Shell checkout portability — 2026-10-12
+
+Windows Git had `core.autocrlf=true`, no attributes rule, and an LF index blob but CRLF
+working copy for `scripts/smoke_compose.sh`. Added only `*.sh text eol=lf` to
+`.gitattributes`. Scoped `git add --renormalize -- scripts/smoke_compose.sh` produced
+no tracked script change: its SHA-1 remains `dc194b39a154832c4d703991d0eac958202a3ddf`
+and mode remains `100755`. Rechecking out that script restores LF without rewriting
+unrelated files. Attributes do not automatically rewrite existing working copies.
+
+Verified a fresh Windows Git index checkout of all staged files to a new temporary
+directory with `core.autocrlf=true`: the script contains zero CR bytes and its raw hash
+matches the original index blob. Checks used that checkout directly, mounted read-only;
+no `sed`, copying/normalization workaround or application changes were needed.
+
+- Windows Git Bash `bash -n scripts/smoke_compose.sh`: **exit 0**.
+- Linux Bash syntax check and full isolated Compose smoke: **exit 0**. Image builds,
+  schema health, API/assets and Dagster checks passed; scoped containers/network/volumes
+  were removed. Full smoke ran through a disposable Linux Docker CLI helper using the
+  fresh Windows checkout directly. Native Windows Bash/Compose path handling was not
+  tested; the Windows verification here covers checkout bytes and Bash syntax.
+- Full Python suite against a new disposable PostgreSQL 17.11 database:
+  **72 passed, 1 warning in 4.40s** (existing Starlette/httpx deprecation).
+- Dashboard tests on Node 22.23.3: **13 passed, 0 failed**.
+- `ruff check --no-cache .`: **All checks passed**.
+- `git diff --check` and `git diff --cached --check`: passed.
+
+No development database or existing Compose volumes were used. New remote CI status
+must be checked for this portability commit; the local results do not establish it.
+
+## Finding #5: API contracts and current dashboard loads — 2026-10-12
+
+Inspected actual populated HTTP responses from a new isolated PostgreSQL container
+before changing the implementation. Existing wrappers, field names, zero/null values,
+DK1/DK2 ordering, run fields and ISO timestamp offset spelling are retained. Response
+models now validate these types and publish them in OpenAPI. Pydantic 2 is declared
+explicitly; it was already installed and pinned in the unchanged dependency lock.
+
+Local verification with Python 3.11.17, PostgreSQL 17.11 and Docker Engine 29.8.2:
+
+- `python -m pytest -q -p no:cacheprovider`: **72 passed, 1 warning in 3.63s**.
+- `python -m pytest -q -p no:cacheprovider tests/test_integration.py`:
+  **21 passed, 1 warning in 3.60s**.
+- `node --test tests/dashboard.test.cjs`: **13 passed, 0 failed** on local Node
+  26.11.1 and the CI-compatible Node 22.23.3 container.
+- `ruff check --no-cache .`: **All checks passed**.
+- `node --check src/grid_report/static/app.js` and `git diff --check`: passed.
+- OpenAPI inspected: required fields, nullable numbers, date/date-time formats, UUIDs
+  and run statuses are exposed correctly.
+- `bash scripts/smoke_compose.sh`: **exit 0**. Image builds, PostgreSQL/schema health,
+  empty report/series/run responses, packaged CSS/JS/fonts, Dagster definitions and
+  the running code location passed. Its scoped containers, network and three volumes
+  were removed; subsequent listings for that exact project were empty.
+  A second run after declaring the existing Pydantic dependency explicitly also exited
+  0 and removed its disposable containers, network and volumes successfully.
+
+The first smoke attempt stopped before creating a Compose project because the Windows
+checkout has CRLF shell-script endings. The successful run used a temporary Linux copy
+with only that script normalized to LF inside a disposable Docker CLI helper. The tracked
+script was unchanged. Tests used a read-only checkout mount, disabled bytecode/pytest
+cache writes, and only the fresh `gridscope-audit5-db` container's isolated `grid_test`
+database with `GRID_TEST_DATABASE=1`, no published ports and its own anonymous volume.
+No development databases or existing Compose volumes were used. The warning is the
+existing Starlette/httpx TestClient deprecation.
+
+PostgreSQL tests cover populated response values and exact fields, chronological
+five-minute instants across normal/spring/autumn days, offset-aware timestamps,
+zero-only versus absent summaries, run statuses/nulls, newest-first history and its
+20-run limit. They also verify the endpoints leave observations and history unchanged.
+Dashboard tests run the actual shipped script with a small DOM fixture and controlled
+HTTP promises: stale responses/errors, cancellation, immediate clearing on date edits,
+HTTP/network/JSON failures, recovery, populated/empty rendering, SVG gaps and zero
+values. Six fixed instants cover DST, Copenhagen/UTC date differences, year boundaries
+and leap days. No npm dependencies were added; CI now runs these tests with Node 22.
+
+Separate API calls still read independent database snapshots. The request ID and abort
+controller prevent superseded browser loads from rendering; they do not provide
+cross-endpoint transactional consistency. DOM fixtures do not test browser layout,
+native date-input behavior or network cancellation implementation. No browser visual
+checks were rerun; HTML, fonts, SVG presentation and CSS were not redesigned. No live
+source polling, ingestion changes or schedule activation were introduced.
+
+GitHub Actions for the preceding ingestion commit `ecc54f1` is now verified:
+[run 38233265942](https://github.com/misaelucas/gridscope/actions/runs/38233265942)
+completed successfully, with both `test` and `compose-smoke` jobs successful. This
+supersedes the earlier observation that no run had appeared yet. Remote CI for finding
+#5 is separate and was not established by these local checks; consult the new PR checks.
+
 ## Finding #4: PostgreSQL serialization and atomicity — 2026-10-12
 
 Verified with Python 3.11.17, PostgreSQL 17.11 and Docker Engine 29.8.2. A newly

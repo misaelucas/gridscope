@@ -30,6 +30,36 @@ SQL builds the expected timeline with `generate_series`, crosses it with both re
 
 Report averages are unweighted averages of available five-minute readings. They cannot estimate total emitted CO₂ without consumption energy data. Completeness describes stored observations accumulated from successful imports. Previous readings are retained if a later response omits them; see the README's boundaries.
 
+## Read-only API and dashboard contract
+
+FastAPI response models validate returned fields and expose their types in `/docs`.
+Existing field names, wrappers, nulls and timestamp offset formatting are preserved.
+
+- `/api/reports?day=YYYY-MM-DD` returns the requested day, Copenhagen timezone, source,
+  unit and `regions` in DK1, DK2 order. Counts describe expected and stored intervals;
+  averages/minima/maxima and observation/ingestion timestamps are null for an empty region.
+- `/api/series?day=YYYY-MM-DD&area=DK1` (default DK1; DK2 also supported) returns the
+  day, area and all expected `observations`, ordered chronologically by instant. Each
+  contains an offset-aware ISO timestamp and numeric intensity or null for a gap.
+  A genuine zero stays numeric zero. Normal, spring and autumn days have 288, 276
+  and 300 slots respectively; repeated local clock labels are distinct UTC instants.
+- `/api/runs` remains an array of the latest 20 attempts, ordered by descending
+  `started_at` (ties have no guaranteed order), across all report days. UUIDs and local
+  dates are strings; timestamps are offset-aware ISO strings. Status is `running`,
+  `success` or `failed`. `finished_at`, `received` and `error` can be null. Existing
+  `archive_path` and error fields remain available, so the API remains local by default.
+
+Each endpoint reads independently: separate report, DK1/DK2 series and history requests
+do **not** provide one database snapshot. An import committed between requests can make
+their results differ. The dashboard renders only the latest submitted request group,
+but that does not add cross-endpoint transactional consistency.
+
+Changing the selected date immediately clears cards, chart and history and cancels pending
+work. Submitting fetches stored data; only the current request group may render or display
+an error. Failed loads clear all dependent displays. Default yesterday is calculated by
+finding today's Copenhagen calendar date and then subtracting one calendar day, including
+DST boundaries. Selection alone does not fetch, and the dashboard does not poll the source.
+
 ## Pagination and concurrent updates
 
 Database updates for the same Danish local day are serialized using a PostgreSQL

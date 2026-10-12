@@ -95,6 +95,27 @@ FastAPI converts query parameters to typed dates and validates region names. Ord
 
 The browser requests summary, series and runs. Series includes NULLs so the SVG line breaks at missing intervals. `textContent` displays values safely. The dashboard labels source limitations because a plausible chart can still mislead if its measurements are misunderstood.
 
+Response models in `api.py` describe the existing JSON fields, nullable readings, dates,
+offset-aware timestamps, UUIDs and run statuses. PostgreSQL integration tests inspect
+populated HTTP responses, not only database helper results: they distinguish zero from
+null, verify region/series/history ordering and exercise both DST day lengths.
+
+`app.js` aborts the previous request group and increments a request ID on a new load or
+date edit. It clears cards, chart and history immediately. Before rendering or reporting
+an error it checks that the ID and selected date still match; cancellation is quiet.
+The ID check also protects against responses that finish despite cancellation. Date edits
+clear the display without fetching until submission. This coordinates browser state;
+the separate endpoints still read independent database snapshots.
+
+Default yesterday first extracts today's calendar date in Europe/Copenhagen, then uses
+UTC calendar arithmetic on that date. Subtracting 24 elapsed hours from the current
+instant can select the wrong day around DST. Run `node --test tests/dashboard.test.cjs`
+with Node.js 22+ to exercise the shipped script using a small DOM fixture and controlled
+fetch promises. No npm packages are required. Tests cover stale responses, cancellation,
+HTTP/network/JSON failures, recovery, empty/populated rendering, gaps/zeros and calendar
+boundaries. These are state tests, not full-browser layout or visual checks. CI runs them
+alongside the Python suite; the design and CSS are unchanged.
+
 **Try:** visit `/docs`, request an invalid date and inspect the 422 response. Request a day with no data: both regions should show no average and 0% completeness. Explain why stale data can still be useful if its timestamp is visible.
 
 ### CSS structure — based on bottenmisa

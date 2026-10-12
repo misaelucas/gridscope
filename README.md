@@ -63,6 +63,8 @@ In another terminal, activate the environment and run `dagster dev -m grid_repor
 ```bash
 ruff check .
 pytest -q
+# Dashboard state tests: Node.js 22+; no npm installation required.
+node --test tests/dashboard.test.cjs
 ```
 
 Database tests skip unless `GRID_TEST_DATABASE=1`. Use an **isolated test database** because integration fixtures truncate this project's tables:
@@ -97,9 +99,11 @@ It returns 503 with `schema: not_ready` before initialization, or `database: una
 database failures. This checks connectivity and readable schema, not migrations, write access,
 data freshness, completeness or full operational readiness.
 
-Local verification on 2026-10-12: 67 tests passed against disposable PostgreSQL; Ruff passed.
-This includes same-day write serialization, different-day independence and SQL rollback tests.
-Earlier Compose smoke verification passed twice, including image builds and container startup.
+Local verification on 2026-10-12: 72 Python tests passed against disposable PostgreSQL;
+13 dashboard state tests and Ruff passed. Coverage includes populated API contracts,
+concurrent dashboard loads and Copenhagen calendar dates across DST.
+GitHub Actions for ingestion commit `ecc54f1` [completed successfully](https://github.com/misaelucas/gridscope/actions/runs/38233265942).
+Compose smoke verification also passed, including image builds and container startup.
 See [verification details](docs/VERIFICATION.md) for scope and limitations.
 
 ## Intentional boundaries
