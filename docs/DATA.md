@@ -32,6 +32,29 @@ Report averages are unweighted averages of available five-minute readings. They 
 
 ## Pagination and concurrent updates
 
+Database updates for the same Danish local day are serialized using a PostgreSQL
+transaction-scoped advisory lock. The key is GridScope's fixed two-integer namespace
+`1196575044` and the local date's ordinal. Different dates use different keys. The lock is
+acquired after fetching and validation, on the connection that upserts observations and
+marks the run successful; commit or rollback releases it. No database transaction is held
+open during HTTP fetching. Missing rows in a later response remain stored.
+
+This is write serialization, not source revision freshness: a previously fetched response
+can acquire the lock later and overwrite a newer reading. Advisory locks coordinate only
+writers using this protocol; direct SQL writers can bypass it. There is no production lock
+timeout or automatic database retry policy.
+
+The initial `running` history row commits before fetching. SQL failures roll back all
+observation changes and the success status together, then a separate transaction records
+`failed`. If failure recording also fails, the original exception is re-raised with a note
+and the recording exception is logged with the run ID; history may remain `running`.
+Process termination and ambiguous commit outcomes after connection loss still require
+manual reconciliation. Raw archives are outside the database transaction.
+
+Schema initialization uses a separate transaction-scoped key (namespace `1196575044`,
+key `0`) to serialize cooperating `init_db` calls. `IF NOT EXISTS` alone is insufficient
+for concurrent first creation. This is not a migration system or protection from external DDL.
+
 Requests sort by UTC timestamp and region, advance offset and stop on a short page. The upstream `total` is not used as a reliable count of all matching rows. A 20-page cap bounds work. Historical complete-day imports reduce moving-window problems, but the API does not supply snapshot isolation. Duplicate keys are rejected rather than silently selecting an arbitrary version. Retries apply to transport failures, HTTP 429 and 5xx; other 4xx fail immediately.
 
 Each page allows at most four attempts. Retry waits use exponential backoff and accept

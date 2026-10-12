@@ -1,5 +1,6 @@
 """Step 4: coordinate extraction, validation, and one atomic database update."""
 from datetime import date
+import logging
 from uuid import uuid4
 
 import httpx
@@ -8,6 +9,8 @@ from grid_report import db
 from grid_report.config import RAW_DIR
 from grid_report.domain import day_bounds, normalize
 from grid_report.source import fetch_day
+
+logger = logging.getLogger(__name__)
 
 
 def ingest_day(day: date, client: httpx.Client | None = None) -> dict:
@@ -31,6 +34,9 @@ def ingest_day(day: date, client: httpx.Client | None = None) -> dict:
             raise ValueError("Source returned observations outside requested local day")
         # Validate EVERYTHING first. A bad page must not partially replace good data.
         with db.connect() as conn:
+            # Fetching is finished; the lock protects writes and success status together.
+            # Lock acquisition order does not establish source revision freshness.
+            db.lock_day(conn, day)
             with conn.cursor() as cur:
                 cur.executemany("""
                     INSERT INTO observations(observed_at, area, intensity, run_id)
@@ -43,7 +49,12 @@ def ingest_day(day: date, client: httpx.Client | None = None) -> dict:
         return {"run_id": str(run_id), "day": str(day), "received": len(observations)}
     except Exception as error:
         # This separate transaction survives the rollback of the observation transaction.
-        with db.connect() as conn:
-            conn.execute("""UPDATE ingestion_runs SET status='failed', finished_at=now(),
-                            error=%s WHERE id=%s""", (str(error)[:2000], run_id))
+        try:
+            with db.connect() as conn:
+                conn.execute("""UPDATE ingestion_runs SET status='failed', finished_at=now(),
+                                error=%s WHERE id=%s""", (str(error)[:2000], run_id))
+        except Exception as recording_error:
+            error.add_note(f"Failure history could not be recorded for run {run_id}: "
+                           f"{type(recording_error).__name__}")
+            logger.exception("Could not record ingestion failure for run %s", run_id)
         raise

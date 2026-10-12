@@ -1,5 +1,44 @@
 # GridScope — Verification — 2026-10-12
 
+## Finding #4: PostgreSQL serialization and atomicity — 2026-10-12
+
+Verified with Python 3.11.17, PostgreSQL 17.11 and Docker Engine 29.8.2. A newly
+created `gridscope-audit4-db` container used its own anonymous data volume, an isolated
+`gridscope-audit4-test` network and no published ports. Only its `grid_test` database
+was used with `GRID_TEST_DATABASE=1`. The checkout was mounted read-only for tests,
+with `PYTHONPATH=/workspace/src`; pytest caching and bytecode writes were disabled.
+No development database, existing Compose volumes or live source data were used.
+
+- `python -m pytest -q -p no:cacheprovider`: **67 passed, 1 warning in 3.02s**.
+- `python -m pytest -q -p no:cacheprovider tests/test_integration.py`:
+  **16 passed, 1 warning in 2.85s**.
+- `ruff check --no-cache .`: **All checks passed**.
+- `git diff --check`: passed.
+- The repository Dockerfile built successfully for the test runtime. The full Compose
+  smoke script was not rerun for this change; earlier successful runs are recorded below.
+
+The warning is the existing Starlette/httpx TestClient deprecation. New integration
+coverage proves same-day imports wait on PostgreSQL advisory locks, different-day
+imports complete while another date remains locked, incomplete replays retain omitted
+rows and aggregates remain correct. SQL trigger failures occur after actual observation
+writes and during success-status updates. A nontransactional sequence proves writes
+occurred; full row snapshots verify rollback including run IDs and update timestamps.
+Failure history commits separately. If that update also fails, the original exception
+is preserved with a note and the recording exception/run ID are logged. A fresh-schema
+test verifies two concurrent initializers wait on the separate initialization lock and
+both complete. Concurrency checks use events, server lock inspection, bounded futures
+and test-only statement timeouts, without sleep-based races.
+
+Advisory locks serialize cooperating database writers, not upstream source revisions.
+A slower fetch can still overwrite newer values. Direct writers/external DDL can bypass
+the protocol. Production lock waits have no configured timeout or automatic database
+retry. Abandoned runs, failure-history outages and ambiguous commits after connection
+loss still need reconciliation; raw archives are not transactional. Initialization
+locking is not a migration mechanism. No API/dashboard contract changes were made.
+
+Remote GitHub Actions for this change had not run at the time of local verification;
+local success does not establish remote CI success.
+
 ## Dagster smoke initialization fix — 2026-10-12
 
 The reported `secondary_indexes already exists` failure is consistent with concurrent initial

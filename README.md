@@ -97,9 +97,10 @@ It returns 503 with `schema: not_ready` before initialization, or `database: una
 database failures. This checks connectivity and readable schema, not migrations, write access,
 data freshness, completeness or full operational readiness.
 
-Local verification on 2026-10-12: 58 tests passed against disposable PostgreSQL; Ruff passed.
-The Compose smoke test exited 2 because Docker Engine was unavailable, so image build and
-container startup remain unverified locally. See [verification details](docs/VERIFICATION.md).
+Local verification on 2026-10-12: 67 tests passed against disposable PostgreSQL; Ruff passed.
+This includes same-day write serialization, different-day independence and SQL rollback tests.
+Earlier Compose smoke verification passed twice, including image builds and container startup.
+See [verification details](docs/VERIFICATION.md) for scope and limitations.
 
 ## Intentional boundaries
 

@@ -9,6 +9,13 @@ from grid_report.config import DATABASE_URL
 from grid_report.domain import day_bounds
 
 SQL = Path(__file__).parent / "sql"
+# Two-int advisory key namespace, shared by cooperating GridScope writers.
+LOCK_NAMESPACE = 1196575044
+
+
+def lock_day(conn, day: date):
+    """Serialize one local day's writes until this connection commits or rolls back."""
+    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (LOCK_NAMESPACE, day.toordinal()))
 
 
 def connect():
@@ -17,6 +24,8 @@ def connect():
 
 def init_db():
     with connect() as conn:
+        # IF NOT EXISTS alone does not serialize concurrent PostgreSQL catalog creation.
+        conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (LOCK_NAMESPACE, 0))
         conn.execute((SQL / "schema.sql").read_text())
 
 

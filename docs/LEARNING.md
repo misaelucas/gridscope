@@ -41,19 +41,39 @@ The composite primary key enforces uniqueness in the database. Python validation
 
 `with connect() as conn` commits on normal exit and rolls back on exceptions. Query values use `%s` placeholders and separate parameters. Never use string interpolation to insert user data into SQL.
 
+`init_db` takes a transaction-scoped PostgreSQL advisory lock before executing schema SQL.
+This serializes concurrent first initialization; `IF NOT EXISTS` alone can still race in
+PostgreSQL's catalogs. The initialization key is separate from all date keys. External DDL
+and schema upgrades still need deliberate coordination and migrations.
+
 **Try:** locate each database constraint and its corresponding Python rule. Explain why the run record is committed before downloading begins.
 
 ## 4. Make imports repeatable — `pipeline.py`, then `cli.py`
 
 Trace `ingest_day`: create run → download → normalize all rows → validate day and uniqueness → transactionally upsert observations and finish run. `ON CONFLICT ... DO UPDATE` makes replay safe and accepts changed values for an existing interval.
 
-The whole batch is validated before writing. The observation update and success status share a transaction. Failure is recorded using a separate transaction so the failure history survives rollback.
+The whole batch is fetched and validated before opening the write transaction. On that
+same connection, `db.lock_day` takes a transaction-scoped advisory lock keyed by the Danish
+local date. Same-day writers wait until commit or rollback; different dates proceed
+independently. The observation update and success status share the protected transaction.
+Failure is recorded using a separate transaction so the failure history survives rollback.
+If recording fails too, the original exception survives with a diagnostic note and a log
+containing the run ID and recording exception. The run can remain `running` in that case.
+
+Lock order does not establish source revision freshness: a slower fetch may overwrite newer
+values. Cooperating writers must use the same lock protocol. There is no production wait
+timeout, abandoned-run recovery or reconciliation of ambiguous network/commit outcomes.
 
 An incomplete response does not delete old data. This is a deliberate accumulated-data policy, documented in DATA.md. It is not a source snapshot or a full history of every revision. A killed process may leave a run marked running; recovery of abandoned runs is future work.
 
 The CLI loops over local dates with an exclusive end. Import a single day first, rerun it, and compare the count with the number of successful runs.
 
 **Try:** read `test_replay_revision_and_gaps`. Explain why three ingestion runs still leave one observation. Run the failure test and inspect the archived response.
+
+The SQL failure tests use triggers after observation writes and during success-status updates.
+A PostgreSQL sequence survives rollback and proves that writes happened before the injected
+error. Full row snapshots prove values, provenance and timestamps rolled back. Concurrency
+tests use events and server lock inspection with bounded waits, rather than timing sleeps.
 
 ## 5. Report the gaps — `sql/report.sql`
 
