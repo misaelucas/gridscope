@@ -72,7 +72,11 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 @app.get("/")
 def dashboard():
-    return FileResponse(STATIC / "index.html")
+    index = STATIC / "spa" / "index.html"
+    if not index.is_file():
+        return JSONResponse(status_code=503, content={
+            "detail": "Frontend build missing. Run npm ci and npm run build in frontend/."})
+    return FileResponse(index)
 
 
 @app.get("/health")

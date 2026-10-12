@@ -16,7 +16,7 @@ dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
 grid-report = "grid_report.cli:main"
 
 [tool.setuptools.package-data]
-grid_report = ["sql/*.sql", "static/*", "static/fonts/*"]
+grid_report = ["sql/*.sql", "static/*", "static/fonts/*", "static/spa/*", "static/spa/assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
