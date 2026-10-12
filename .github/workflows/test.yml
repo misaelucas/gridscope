@@ -28,6 +28,10 @@ jobs:
       - run: pip install -r requirements.lock.txt && pip install --no-deps -e '.[dev]'
       - run: ruff check .
       - run: pytest -q
+      - run: npm run build && node scripts/check-static.mjs
+        working-directory: frontend
+        env:
+          VITE_DATA_MODE: static
   compose-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15

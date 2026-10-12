@@ -17,3 +17,4 @@
 .chart-tooltip dt { color: var(--series-dk1); }
 .chart-tooltip dl > div + div dt { color: var(--series-dk2); }
 .chart-tooltip dd { margin: 0; font-variant-numeric: tabular-nums; }
+.demo-notice p { margin-block: .35rem; }

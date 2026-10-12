@@ -42,4 +42,16 @@ export interface ReportData {
   report: DailyReport;
   points: ChartPoint[];
   runs: IngestionRun[];
+  manifest?: DemoManifest;
+}
+export interface DemoManifest {
+  schema_version: 1;
+  revision: string;
+  dates: string[];
+  source: string;
+  source_url: string;
+  unit: string;
+  timezone: 'Europe/Copenhagen';
+  exported_at: string;
+  limitations: string[];
 }

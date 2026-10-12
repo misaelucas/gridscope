@@ -1,5 +1,76 @@
 # GridScope — Verification — 2026-10-12
 
+## Cloudflare Pages historical demo — 2026-10-12
+
+PR #2 was confirmed merged at `0fcb732`; branch `codex/cloudflare-static-demo`
+starts there. The earlier requested README expansion is carried forward in this change.
+The existing ingestion pipeline, database implementation and Dagster are unchanged.
+The tracked typography/theme/layout CSS remains the visual baseline.
+
+### Genuine export
+
+Read-only requests to the existing local API verified 2026-10-09: DK1 and DK2 each
+have 288 observed/expected intervals, 0 missing and 100% completeness. Export command:
+
+```sh
+python -m grid_report.export_demo --api-url http://host.docker.internal:8000 --day 2026-10-09 --output frontend/demo
+```
+
+This command ran in the Python verification container with the repository mounted and
+`PYTHONPATH=/workspace/src`. On the host use `http://127.0.0.1:8000` instead.
+The exported revision is `5d20edd823639a3b`, timestamp
+`2026-10-12T11:06:56.628086+00:00`. Full timelines, counts, latest observations and
+aggregates were checked before writing. DK1 mean is 126.64236111111111 and DK2 mean
+is 60.84027777777778 g CO2/kWh. This exports existing genuine historical observations;
+no new Energinet ingestion occurred. No run history was requested and operational
+metadata was removed. Synthetic exporter/frontend fixtures are test-only.
+
+### Checks
+
+- Full Python suite, Python 3.11 and a new disposable PostgreSQL 17.11 instance:
+  **84 passed, 1 warning in 3.97s** (`python -m pytest -q -p no:cacheprovider`).
+  Existing Starlette/httpx deprecation only. Development DB/volumes were not modified.
+- `ruff check --no-cache .`: **All checks passed**.
+- Windows frontend: **35 passed across 4 files in 2.58s**.
+- Fresh Linux Node 22.23.3 `npm ci` and tests (with static environment set):
+  **35 passed across 4 files in 2.00s**. Mode fixtures are explicit and independent of
+  the shell's environment. Dependency installation reported **0 vulnerabilities**.
+- TypeScript plus API and static production builds: **passed on Windows and Linux**.
+  Absolute font URL warnings remain intentional; static output packages those exact
+  fonts, and API mode serves them from FastAPI. Runtime requests passed.
+- `node frontend/scripts/check-static.mjs`: **passed**. Checked root asset references,
+  entry/lazy JS chunks, CSS, fonts, social image, CSP/embedding headers, manifest-listed
+  day files, sanitized data, chronological slots and the content-derived revision.
+- Real Edge through optional Playwright script: **desktop hover and mobile touch passed**
+  on the actual static production build and exported observations. Checked deep-link
+  navigation/refresh, generated CSP, labels, both tooltip readings/offset, fonts,
+  responsive overflow, unavailable dates, missing JSON/recovery and **zero `/api` requests**.
+  Its server emulates Pages SPA fallback and applies the emitted CSP. It does not establish
+  Cloudflare deployment correctness. The preview PNG captures the genuine-data chart.
+- Static Vite development manifest, day JSON and font HTTP checks: **passed** on port
+  5174 (5173 was already occupied; the existing process was left untouched).
+- Linux Bash syntax and full isolated Compose smoke: **exit 0**. Multi-stage API build,
+  compiled assets/fonts, health/schema, empty endpoints and Dagster passed. Project
+  `gridscope-smoke-xxxxiknmaj` containers/network/volumes were removed and checked absent.
+- `git diff --check`: **passed**. Export JSON has explicit LF attributes to keep
+  content revisions stable across Windows checkouts.
+
+The Pages settings, exact Windows/Linux commands, local re-export instructions and
+portfolio description/tags are in README. Static mode includes only the listed export;
+API mode remains default. Static builds do not replace the Python package's SPA artifacts.
+
+### Limits
+
+No Cloudflare account was connected and nothing was deployed. The user must merge after
+review, configure Pages, set the actual `VITE_SITE_URL` for absolute social preview URLs,
+and verify the deployed URL/headers. Portfolio embedding is permitted for misaa.dev by
+CSP, but no portfolio repository was changed or iframe tested on that live origin.
+Separate API endpoints are not one snapshot; exporter agreement checks do not prove
+source freshness. Only one genuine historical day is included; DST/gaps/zeros are covered
+by unpublished fixtures. Browser checks used Edge, not Safari/Firefox or physical devices.
+Native Windows Compose was not tested; smoke used Linux containers. New remote CI must
+be checked independently after this branch is pushed.
+
 ## React dashboard modernization — 2026-10-12
 
 The tracked dashboard screenshot and unchanged `fonts.css`, `theme.css` and

@@ -93,7 +93,7 @@ Read each common table expression (CTE) in order:
 
 FastAPI converts query parameters to typed dates and validates region names. Ordinary `def` endpoints perform blocking database work in FastAPI's thread pool. They read stored data; dashboard visitors never cause source downloads.
 
-The browser requests summary, series and runs. Series includes NULLs so the SVG line breaks at missing intervals. `textContent` displays values safely. The dashboard labels source limitations because a plausible chart can still mislead if its measurements are misunderstood.
+In API mode the browser requests summary, series and runs. Series includes NULLs so the SVG line breaks at missing intervals. React renders text values safely. The dashboard labels source limitations because a plausible chart can still mislead if its measurements are misunderstood.
 
 Response models in `api.py` describe the existing JSON fields, nullable readings, dates,
 offset-aware timestamps, UUIDs and run statuses. PostgreSQL integration tests inspect
@@ -144,6 +144,35 @@ Vite proxies the read-only endpoints and fonts during development. Its productio
 package directory. Docker builds them in Node 22 before installing Python, and package-data
 includes the generated entry point/chunks plus the existing fonts. The smoke test inspects
 compiled HTML and fetches every generated JS/CSS chunk and packaged font.
+
+### One dashboard, two data adapters
+
+`staticData.ts` loads a versioned historical manifest/day file when
+`VITE_DATA_MODE=static`; `api.ts` otherwise keeps the original read-only endpoints.
+Both return the same report/merged-point representation to React. Static mode has
+no operational runs, starts on an available date and labels export time separately
+from observation time. It never falls back to an absent backend. The existing abort
+controller/request identity logic protects both modes.
+
+Follow `export_demo.py`: parse the existing API models → validate full Copenhagen-day
+UTC timelines → recompute counts/aggregates → remove operational metadata → encode
+sorted JSON → derive a revision → publish the manifest last. Real nulls survive; the
+exporter does not manufacture data. Separate responses still are not a database snapshot.
+`tests/test_export_demo.py` tests this with unpublished fixtures; the committed public
+export was produced from the local API's genuine 2026-10-09 readings.
+
+Static Vite builds use `/` as the base, package local fonts and copy only manifest-listed
+JSON. API builds retain `/static/spa/` and Python packaging. Static builds do not overwrite
+that Python package. `pages/_headers` supplies a same-origin CSP with explicit portfolio
+iframe origins. Social metadata uses `VITE_SITE_URL` when an actual public origin is known.
+No Cloudflare account is connected and no deployment occurs in this workflow.
+
+**Try:** build with static mode using the README's platform-specific commands, then run
+`node frontend/scripts/check-static.mjs`. With Playwright and a browser available,
+`node frontend/scripts/browser-static.cjs` serves only `dist` and checks desktop/touch
+tooltips, refresh, assets, unavailable dates, missing JSON recovery and zero API requests.
+The local server emulates SPA fallback and applies the generated CSP; it does not prove
+Cloudflare's deployed configuration. Compare the static and API builds' asset paths.
 
 ## 7. Orchestrate existing logic — `definitions.py`
 

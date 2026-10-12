@@ -1,0 +1,19 @@
+{
+  "dates": [
+    "2026-10-09"
+  ],
+  "exported_at": "2026-10-12T11:06:56.628086+00:00",
+  "limitations": [
+    "Historical observations, not a live feed or a freshness guarantee.",
+    "Preliminary Energinet estimates; upstream errors may remain uncorrected.",
+    "Carbon intensity in g CO2/kWh is not total CO2 emissions; daily means are not consumption-weighted.",
+    "Missing observations remain null. Stored data may accumulate across imports.",
+    "API endpoints are read independently; this export checks report/series agreement, not a shared snapshot."
+  ],
+  "revision": "5d20edd823639a3b",
+  "schema_version": 1,
+  "source": "Energinet / CO2Emis",
+  "source_url": "https://www.energidataservice.dk/tso-electricity/co2emis",
+  "timezone": "Europe/Copenhagen",
+  "unit": "g CO2/kWh"
+}
