@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { copenhagenTimestamp } from '../time';
 import type { IngestionRun, RegionReport } from '../types';
+import { isStaticMode } from '../staticData';
 
 const reading = (value: number | null) => value === null ? 'No data' : value.toFixed(1);
 export function DatePicker({ day, onChange, onSubmit }: {
@@ -20,7 +21,7 @@ export function SummaryCards({ regions }: { regions: RegionReport[] }) {
       {region.completeness_percent}% complete · {region.missing_intervals}/{region.expected_intervals} intervals missing
     </p>
     <small>Latest observation: {region.latest_observation ? copenhagenTimestamp(region.latest_observation) : 'never'}</small><br />
-    <small>Last ingested: {region.last_ingested_at ? copenhagenTimestamp(region.last_ingested_at) : 'never'}</small>
+    {!isStaticMode() && <small>Last ingested: {region.last_ingested_at ? copenhagenTimestamp(region.last_ingested_at) : 'never'}</small>}
   </section>)}</div>;
 }
 export function ReportSection({ number, title, detail, wide, children }: {
@@ -42,6 +43,8 @@ export function IngestionHistory({ runs }: { runs: IngestionRun[] }) {
 export function Methodology() {
   return <footer><p className="detail">Source: <a href="https://www.energidataservice.dk/tso-electricity/co2emis">Energinet CO2Emis</a>.
     {' '}Preliminary estimates; upstream errors may remain uncorrected. Daily averages use available readings and are not consumption-weighted emissions totals.</p>
-    <p className="detail">Stored historical observations · g CO₂/kWh · Reports, series and run history are read independently, without a shared database snapshot.</p>
+    <p className="detail">Stored historical observations · g CO₂/kWh · {isStaticMode()
+      ? 'Versioned historical export. Missing values remain gaps. Exported API responses were checked for report/series agreement, not a shared database snapshot.'
+      : 'Reports, series and run history are read independently, without a shared database snapshot.'}</p>
   </footer>;
 }

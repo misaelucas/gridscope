@@ -1,4 +1,5 @@
 import type { ChartPoint, DailyReport, DailySeries, IngestionRun, ReportData } from './types';
+import { isStaticMode, loadStaticDay } from './staticData';
 
 export function mergeSeries(dk1: DailySeries, dk2: DailySeries): ChartPoint[] {
   const points = new Map<number, ChartPoint>();
@@ -20,6 +21,10 @@ async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 export async function loadReport(day: string, signal: AbortSignal): Promise<ReportData> {
+  if (isStaticMode()) {
+    const { report, series, manifest } = await loadStaticDay(day, signal);
+    return { report, points: mergeSeries(series[0], series[1]), runs: [], manifest };
+  }
   const query = encodeURIComponent(day);
   const [report, dk1, dk2, runs] = await Promise.all([
     get<DailyReport>(`/api/reports?day=${query}`, signal),

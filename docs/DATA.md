@@ -71,6 +71,31 @@ decimal as before. This is a presentation change, not interpolation or energy we
 
 ## Pagination and concurrent updates
 
+### Public historical demo export
+
+`python -m grid_report.export_demo` reads existing reports and both series through the
+read-only API, using the existing response models. It checks each complete expected
+five-minute timeline against the Danish day, counts, completeness, latest observation
+and aggregates. Inconsistent responses fail before any public files are written. This
+agreement check does not establish a cross-endpoint database snapshot or source revision
+freshness. Nulls and genuine zeros are preserved; missing observations are never invented.
+
+The public manifest records dates, source attribution, units, timezone, export timestamp
+and limitations. Sorted day JSON is addressed by a content-derived revision. Export
+time is not observation time or an ingestion freshness guarantee. Run history is never
+requested; model whitelisting removes extra fields and `last_ingested_at` is nulled.
+Credentials, source archives, internal errors and filesystem paths are not published.
+
+`VITE_DATA_MODE=static` uses only the manifest and its listed day files, with the same
+React components and UTC alignment as API mode. It defaults to the newest available
+historical date, hides operational history and labels the export as historical. A date
+outside the manifest yields an empty state without a day-file request. Missing/invalid
+JSON yields a recoverable error; there is no backend fallback. The included genuine
+2026-10-09 export has 288 non-null slots per region, verified against the local API.
+Synthetic DST/zero/null fixtures exist only in tests and are not part of this export.
+
+### Database writes and source pagination
+
 Database updates for the same Danish local day are serialized using a PostgreSQL
 transaction-scoped advisory lock. The key is GridScope's fixed two-integer namespace
 `1196575044` and the local date's ordinal. Different dates use different keys. The lock is

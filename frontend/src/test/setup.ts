@@ -1,8 +1,10 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+// Each mode test opts in explicitly, independent of the developer's shell setting.
+beforeEach(() => { vi.stubEnv('VITE_DATA_MODE', 'api'); });
 class ResizeObserverMock {
   constructor(private callback: ResizeObserverCallback) {}
   observe(target: Element) {
