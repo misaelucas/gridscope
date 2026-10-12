@@ -1,4 +1,4 @@
-# Grid Report
+# GridScope — Danish Electricity Carbon Intensity Analytics
 
 A Python + PostgreSQL reporting pipeline for Danish electricity consumption carbon intensity. Uses public Energinet CO2Emis observations for DK1 and DK2; provides daily SQL summaries, missing-data checks, a read-only FastAPI service, a dashboard and Dagster orchestration.
 

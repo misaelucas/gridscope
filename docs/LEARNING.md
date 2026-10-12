@@ -1,4 +1,4 @@
-# Learn by following one observation
+# GridScope — Learn by following one observation
 
 Read this in order with the files open beside it. The objective is to explain and change the project yourself, including code initially written with assistance.
 

@@ -1,4 +1,15 @@
-# Verification — 2026-10-12
+# GridScope — Verification — 2026-10-12
+
+## Version-control preparation — 2026-10-12
+
+- `.venv/bin/pytest -q tests/test_definitions.py tests/test_domain.py tests/test_source.py`: 20 passed in 0.50s.
+- `.venv/bin/ruff check .`: All checks passed.
+- This run covered the scheduled-time partition fix and non-database tests. Database integration,
+  live ingestion, Docker startup, browser rendering and remote CI were not rerun.
+- Public text now uses GridScope. Python distribution/package names, CLI commands and internal
+  paths remain unchanged. Existing screenshots predate the identity change.
+
+## Earlier implementation verification
 
 Executed locally with Python 3.11, PostgreSQL bundled by pgserver 0.1.4, and Chromium through Playwright.
 

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from grid_report import db
 
-app = FastAPI(title="Grid Report", version="0.1.0")
+app = FastAPI(title="GridScope", version="0.1.0")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 

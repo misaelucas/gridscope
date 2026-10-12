@@ -1,4 +1,4 @@
-# Data contract and reporting meaning
+# GridScope — Data contract and reporting meaning
 
 ## Source evidence
 
