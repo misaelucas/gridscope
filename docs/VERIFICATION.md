@@ -1,5 +1,34 @@
 # GridScope — Verification — 2026-10-12
 
+## Shell checkout portability — 2026-10-12
+
+Windows Git had `core.autocrlf=true`, no attributes rule, and an LF index blob but CRLF
+working copy for `scripts/smoke_compose.sh`. Added only `*.sh text eol=lf` to
+`.gitattributes`. Scoped `git add --renormalize -- scripts/smoke_compose.sh` produced
+no tracked script change: its SHA-1 remains `dc194b39a154832c4d703991d0eac958202a3ddf`
+and mode remains `100755`. Rechecking out that script restores LF without rewriting
+unrelated files. Attributes do not automatically rewrite existing working copies.
+
+Verified a fresh Windows Git index checkout of all staged files to a new temporary
+directory with `core.autocrlf=true`: the script contains zero CR bytes and its raw hash
+matches the original index blob. Checks used that checkout directly, mounted read-only;
+no `sed`, copying/normalization workaround or application changes were needed.
+
+- Windows Git Bash `bash -n scripts/smoke_compose.sh`: **exit 0**.
+- Linux Bash syntax check and full isolated Compose smoke: **exit 0**. Image builds,
+  schema health, API/assets and Dagster checks passed; scoped containers/network/volumes
+  were removed. Full smoke ran through a disposable Linux Docker CLI helper using the
+  fresh Windows checkout directly. Native Windows Bash/Compose path handling was not
+  tested; the Windows verification here covers checkout bytes and Bash syntax.
+- Full Python suite against a new disposable PostgreSQL 17.11 database:
+  **72 passed, 1 warning in 4.40s** (existing Starlette/httpx deprecation).
+- Dashboard tests on Node 22.23.3: **13 passed, 0 failed**.
+- `ruff check --no-cache .`: **All checks passed**.
+- `git diff --check` and `git diff --cached --check`: passed.
+
+No development database or existing Compose volumes were used. New remote CI status
+must be checked for this portability commit; the local results do not establish it.
+
 ## Finding #5: API contracts and current dashboard loads — 2026-10-12
 
 Inspected actual populated HTTP responses from a new isolated PostgreSQL container
