@@ -1,10 +1,15 @@
 // Step 6: render database-backed API responses. textContent avoids HTML injection.
 const day = document.querySelector('#day');
 const fmt = new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/Copenhagen',year:'numeric',month:'2-digit',day:'2-digit'});
-const yesterday = new Date(Date.now()-86400000);
-const parts = Object.fromEntries(fmt.formatToParts(yesterday).map(p=>[p.type,p.value]));
-day.value = `${parts.year}-${parts.month}-${parts.day}`;
-async function get(url){const response=await fetch(url);if(!response.ok)throw new Error(`Request failed (${response.status}). Check the database and API logs.`);return response.json();}
+function previousDanishDay(now = new Date()){
+ const parts=Object.fromEntries(fmt.formatToParts(now).map(p=>[p.type,p.value]));
+ // Find today's Copenhagen calendar date before subtracting a calendar day.
+ const calendar=new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`);
+ calendar.setUTCDate(calendar.getUTCDate()-1);
+ return calendar.toISOString().slice(0,10);
+}
+day.value = previousDanishDay();
+async function get(url,signal){const response=await fetch(url,{signal});if(!response.ok)throw new Error(`Request failed (${response.status}). Check the database and API logs.`);return response.json();}
 const value = n => n === null ? 'No data' : n.toFixed(1);
 function node(tag,text,parent){const el=document.createElement(tag);el.textContent=text;parent.append(el);return el;}
 function draw(series){
@@ -29,14 +34,27 @@ function draw(series){
   element('text',{x:60+i/(obs.length-1)*920,y:285,fill:ink,'text-anchor':i===obs.length-1?'end':'start','font-size':14}).textContent=label;
  }
 }
-async function load(){
+let requestId=0,activeController;
+function clearDisplays(){for(const id of ['#cards','#chart','#runs'])document.querySelector(id).replaceChildren();}
+function resetLoad(){
+ requestId++;activeController?.abort();clearDisplays();
  document.querySelector('#error').textContent='';
+}
+async function load(){
+ resetLoad();
+ const id=requestId,selectedDay=day.value,controller=new AbortController();
+ activeController=controller;
  try{
-  const [report,dk1,dk2,runs]=await Promise.all([get(`/api/reports?day=${day.value}`),get(`/api/series?day=${day.value}&area=DK1`),get(`/api/series?day=${day.value}&area=DK2`),get('/api/runs')]);
+  const [report,dk1,dk2,runs]=await Promise.all([get(`/api/reports?day=${selectedDay}`,controller.signal),get(`/api/series?day=${selectedDay}&area=DK1`,controller.signal),get(`/api/series?day=${selectedDay}&area=DK2`,controller.signal),get('/api/runs',controller.signal)]);
+  if(id!==requestId || selectedDay!==day.value)return;
   const cards=document.querySelector('#cards');cards.replaceChildren();
   for(const r of report.regions){const card=node('section','',cards);card.className='region';node('h2',r.area,card);node('div',`${value(r.average_g_per_kwh)} g CO₂/kWh`,card).className='value';node('p',`Peak: ${value(r.peak_g_per_kwh)} · Minimum: ${value(r.minimum_g_per_kwh)}`,card);node('p',`${r.completeness_percent}% complete · ${r.missing_intervals}/${r.expected_intervals} intervals missing`,card).className=r.missing_intervals?'warning':'';node('small',`Last ingested: ${r.last_ingested_at?new Date(r.last_ingested_at).toLocaleString():'never'}`,card);}
   draw([dk1,dk2]);const body=document.querySelector('#runs');body.replaceChildren();
   for(const r of runs){const tr=node('tr','',body);for(const v of [r.report_day,r.status,r.received??'—',r.finished_at?new Date(r.finished_at).toLocaleString():'—'])node('td',String(v),tr);}
- }catch(error){document.querySelector('#cards').replaceChildren();document.querySelector('#chart').replaceChildren();document.querySelector('#error').textContent=error.message;}
+ }catch(error){
+  if(id!==requestId || selectedDay!==day.value || error.name==='AbortError')return;
+  controller.abort();clearDisplays();document.querySelector('#error').textContent=error.message;
+ }
 }
+day.addEventListener('input',resetLoad);day.addEventListener('change',resetLoad);
 document.querySelector('#filter').addEventListener('submit',event=>{event.preventDefault();load();});load();

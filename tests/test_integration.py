@@ -1,10 +1,10 @@
 """Real PostgreSQL tests; use an isolated database (tables are cleared per test)."""
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime, timedelta
 from threading import Event
 from time import monotonic
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import psycopg
@@ -298,3 +298,119 @@ def test_concurrent_first_schema_initialization(monkeypatch):
         with original_connect() as conn:
             conn.execute(psycopg.sql.SQL("DROP SCHEMA {} CASCADE").format(
                 psycopg.sql.Identifier(schema)))
+
+
+@pytest.mark.parametrize("day,expected", [
+    (DAY, 288), (date(2026, 3, 29), 276), (date(2026, 10, 25), 300),
+])
+def test_populated_api_contract(day, expected):
+    from grid_report.domain import day_bounds
+
+    start, end = day_bounds(day)
+    records = records_for(day, (0, 10, 20))
+    del records[1]  # A genuine zero, then a gap, then a nonzero reading.
+    with httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(
+        200, json={"records": list(reversed(records))}))) as source:
+        result = ingest_day(day, source)
+    before, history = snapshot(), db.runs()
+    client = TestClient(app)
+    response = client.get("/api/reports", params={"day": day.isoformat()})
+    assert response.status_code == 200
+    report = response.json()
+    assert {k: v for k, v in report.items() if k != "regions"} == {
+        "day": day.isoformat(), "timezone": "Europe/Copenhagen",
+        "source": "Energinet / CO2Emis", "unit": "g CO2/kWh"}
+    assert [r["area"] for r in report["regions"]] == ["DK1", "DK2"]
+    dk1, dk2 = report["regions"]
+    assert dk1 == {
+        "area": "DK1", "observed_intervals": 2, "expected_intervals": expected,
+        "missing_intervals": expected - 2, "completeness_percent": round(200 / expected, 2),
+        "average_g_per_kwh": 10.0, "peak_g_per_kwh": 20.0, "minimum_g_per_kwh": 0.0,
+        "latest_observation": (start + timedelta(minutes=10)).isoformat(),
+        "last_ingested_at": before[0]["updated_at"].isoformat()}
+    assert dk2["observed_intervals"] == 0
+    assert dk2["expected_intervals"] == dk2["missing_intervals"] == expected
+    assert dk2["completeness_percent"] == 0
+    for key in ("average_g_per_kwh", "peak_g_per_kwh", "minimum_g_per_kwh",
+                "latest_observation", "last_ingested_at"):
+        assert dk2[key] is None
+    for area in ("DK1", "DK2"):
+        response = client.get("/api/series", params={"day": day.isoformat(), "area": area})
+        assert response.status_code == 200
+        series = response.json()
+        assert set(series) == {"day", "area", "observations"}
+        assert series["day"] == day.isoformat() and series["area"] == area
+        observations = series["observations"]
+        assert len(observations) == expected
+        times = [datetime.fromisoformat(o["timestamp"]) for o in observations]
+        assert all(t.utcoffset() is not None for t in times)
+        assert times == [start + timedelta(minutes=5 * i) for i in range(expected)]
+        assert times[-1] == end - timedelta(minutes=5)
+        assert all(set(o) == {"timestamp", "intensity"} for o in observations)
+        assert [o["intensity"] for o in observations[:3]] == (
+            [0.0, None, 20.0] if area == "DK1" else [None, None, None])
+        assert all(o["intensity"] is None for o in observations[3:])
+    response = client.get("/api/runs")
+    assert response.status_code == 200
+    run, = response.json()
+    assert run["id"] == result["run_id"]
+    assert run["status"] == "success" and run["received"] == 2
+    assert run["report_day"] == day.isoformat()
+    assert run["error"] is None
+    assert run["archive_path"] == history[0]["archive_path"]
+    for key in ("started_at", "finished_at"):
+        assert datetime.fromisoformat(run[key]).utcoffset() is not None
+        assert run[key] == history[0][key].isoformat()
+    assert snapshot() == before and db.runs() == history  # All endpoints remain read-only.
+
+
+def test_zero_only_api_summary_is_not_missing_data():
+    import_records(values=(0,))
+    response = TestClient(app).get("/api/reports", params={"day": DAY.isoformat()})
+    assert response.status_code == 200
+    dk1, dk2 = response.json()["regions"]
+    for key in ("average_g_per_kwh", "peak_g_per_kwh", "minimum_g_per_kwh"):
+        assert dk1[key] == 0.0
+        assert dk2[key] is None
+
+
+def test_api_run_history_statuses_order_and_limit():
+    success = import_records(values=(0,))
+    with client_for(-1) as source, pytest.raises(ValueError):
+        ingest_day(DAY, source)
+    failed = next(r for r in db.runs() if r["status"] == "failed")
+    running = uuid4()
+    with db.connect() as conn:
+        conn.execute("""UPDATE ingestion_runs SET started_at='2026-10-10T00:00:00Z'
+                        WHERE id=%s""", (success["run_id"],))
+        conn.execute("""UPDATE ingestion_runs SET started_at='2026-10-11T00:00:00Z'
+                        WHERE id=%s""", (failed["id"],))
+        conn.execute("""INSERT INTO ingestion_runs(id, report_day, status, archive_path, started_at)
+                        VALUES (%s, %s, 'running', '/test/running', '2026-10-12T00:00:00Z')""",
+                     (running, DAY))
+        with conn.cursor() as cur:
+            cur.executemany("""INSERT INTO ingestion_runs
+                (id, report_day, status, archive_path, started_at)
+                VALUES (%s, %s, 'running', '/test/older', %s)""", [
+                    (uuid4(), DAY, datetime.fromisoformat("2026-01-01T00:00:00+00:00")
+                     + timedelta(days=i)) for i in range(21)])
+    response = TestClient(app).get("/api/runs")
+    assert response.status_code == 200
+    runs = response.json()
+    assert len(runs) == 20
+    assert [r["id"] for r in runs[:3]] == [str(running), str(failed["id"]), success["run_id"]]
+    assert [r["status"] for r in runs[:3]] == ["running", "failed", "success"]
+    assert runs[0]["received"] is runs[0]["finished_at"] is runs[0]["error"] is None
+    assert runs[1]["received"] is None and runs[1]["error"]
+    assert runs[1]["finished_at"] is not None
+    assert runs[2]["received"] == 1 and runs[2]["error"] is None
+    assert all(set(r) == {"id", "report_day", "started_at", "finished_at", "status",
+                          "received", "error", "archive_path"} for r in runs)
+    timestamps = [datetime.fromisoformat(r["started_at"]) for r in runs]
+    assert timestamps == sorted(timestamps, reverse=True)
+    for run in runs:
+        assert str(UUID(run["id"])) == run["id"]
+        assert date.fromisoformat(run["report_day"]) == DAY
+        for key in ("started_at", "finished_at"):
+            if run[key] is not None:
+                assert datetime.fromisoformat(run[key]).utcoffset() is not None
