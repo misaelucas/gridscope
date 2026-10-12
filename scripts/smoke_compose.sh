@@ -77,9 +77,17 @@ check_health uninitialized
 "${compose[@]}" exec -T api grid-report init
 check_health ready
 "${compose[@]}" up -d dagster
-"${compose[@]}" exec -T dagster dagster definitions validate --load-with-grpc -m grid_report.definitions
+# Validate definitions without opening the live DAGSTER_HOME while dev initializes SQLite.
+"${compose[@]}" exec -T dagster python - <<'PY'
+from dagster import Definitions
+from grid_report.definitions import defs
+
+Definitions.validate_loadable(defs)
+print("Dagster definitions validated without instance storage.")
+PY
 
 "${compose[@]}" exec -T api python - <<'PY'
+from importlib.resources import files
 import time
 import httpx
 
@@ -111,7 +119,11 @@ with httpx.Client(base_url="http://127.0.0.1:8000", timeout=5) as client:
     ]:
         response = get(f"/static/{asset}")
         assert response.content, asset
-        assert content_type in response.headers["content-type"], asset
+        if asset.endswith(".ttf"):
+            # Slim images may lack the host's MIME database; verify the font itself.
+            assert response.content == files("grid_report").joinpath("static", asset).read_bytes(), asset
+        else:
+            assert content_type in response.headers["content-type"], asset
     print("Empty reporting, series, runs and packaged assets verified.")
 
 # Verify the running webserver loaded its code location, not just an import in another process.

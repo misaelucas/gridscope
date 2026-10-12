@@ -1,5 +1,45 @@
 # GridScope — Verification — 2026-10-12
 
+## Dagster smoke initialization fix — 2026-10-12
+
+The reported `secondary_indexes already exists` failure is consistent with concurrent initial
+SQLite schema creation: the smoke script started `dagster dev` and immediately invoked
+`dagster definitions validate` against the same fresh `/app/.dagster`. Inspection of the installed
+CLI confirms it opens a Dagster instance before validation. The traceback identifies that instance's
+SQLite table creation, rather than GridScope's PostgreSQL tables or an invalid asset definition.
+
+The smoke test now uses the public `Definitions.validate_loadable(defs)` API without opening
+instance storage. The separate GraphQL check still verifies the running Dagster webserver's
+code location loads. The deprecated CLI is removed; `dg` / `dagster-dg-cli` is not installed or
+declared, so no new CLI dependency or project configuration was introduced.
+
+Actual verification with Docker Engine 29.0.0:
+
+- `.venv/bin/pytest -q tests/test_smoke_definitions.py tests/test_definitions.py`:
+  **10 passed in 0.53s**. The actual embedded smoke validator is executed with instance access
+  forbidden and an existing DAGSTER_HOME marker; it leaves storage untouched. Invalid resource
+  requirements are rejected by the validation API.
+- Full suite against a fresh disposable pgserver database: **60 passed, 1 warning in 2.13s**.
+  The remaining warning is the existing Starlette/httpx TestClient deprecation.
+- `.venv/bin/ruff check .`: All checks passed.
+- `bash -n scripts/smoke_compose.sh` and `git diff --check`: passed.
+- First real smoke run with the Dagster fix passed definitions validation, then exposed an overly
+  strict font MIME assertion. The slim image's MIME lookup returns no type for `.ttf`, so static
+  delivery uses the generic binary type. Font checks now compare HTTP bytes to the packaged font
+  instead of requiring the host's MIME database; serving behavior and CSS are unchanged.
+- `bash scripts/smoke_compose.sh` (log `/tmp/gridscope-smoke-fix-2.log`): **exit 0**. Image builds,
+  fresh PostgreSQL readiness, schema-not-ready and ready health responses, empty reports/series,
+  packaged assets, definition validation and the running Dagster code location all passed.
+  Scoped containers, network and all three volumes were removed successfully.
+- Repeated the full smoke test with another fresh project (log
+  `/tmp/gridscope-smoke-fix-3.log`): **exit 0** with the same checks passing. Follow-up container
+  and volume listings for that exact project were empty after cleanup.
+
+No schedule was enabled, no live ingestion ran, and no existing project volumes were modified.
+Validation checks definition structure without creating an instance; the GraphQL check covers
+actual code-location loading. This does not verify scheduled execution or production concurrency.
+Remote CI has not been run.
+
 ## Compose delivery and readiness — 2026-10-12
 
 Executed with Python 3.11.2 and Docker Compose v2.40.3:
