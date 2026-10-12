@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+import psycopg
 
 from grid_report import db
 
@@ -21,9 +22,21 @@ def dashboard():
 
 @app.get("/health")
 def health():
-    with db.connect() as conn:
-        conn.execute("SELECT 1")
-    return {"status": "ok"}
+    try:
+        with db.connect() as conn:
+            conn.execute("SELECT 1")
+            # Validate the columns used by reporting without scanning table data.
+            conn.execute("""SELECT observed_at, area, intensity, run_id, updated_at
+                            FROM observations LIMIT 0""")
+            conn.execute("""SELECT id, report_day, started_at, finished_at, status,
+                            received, error, archive_path FROM ingestion_runs LIMIT 0""")
+    except (psycopg.errors.UndefinedTable, psycopg.errors.UndefinedColumn):
+        return JSONResponse(status_code=503, content={
+            "status": "unavailable", "database": "ok", "schema": "not_ready"})
+    except psycopg.Error:
+        return JSONResponse(status_code=503, content={
+            "status": "unavailable", "database": "unavailable", "schema": "unknown"})
+    return {"status": "ok", "database": "ok", "schema": "ready"}
 
 
 @app.get("/api/reports")

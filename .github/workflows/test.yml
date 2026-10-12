@@ -16,7 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with: {python-version: '3.11'}
       - run: pip install -r requirements.lock.txt && pip install --no-deps -e '.[dev]'
       - run: ruff check .
       - run: pytest -q
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/smoke_compose.sh

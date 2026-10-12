@@ -45,7 +45,7 @@ docker compose down
 ## Local Python development
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
 # Run just the database in Docker:
@@ -75,6 +75,32 @@ pytest -q
 
 Create `grid_test` first, e.g. `docker compose exec db createdb -U grid grid_test`. GitHub Actions supplies an isolated PostgreSQL service automatically. Integration coverage includes replay, revised observations, failed imports preserving good data, SQL gaps, DST and API validation.
 
+### Isolated Compose smoke test
+
+Requires a running Docker Engine and Docker Compose **2.24.4 or newer**:
+
+```bash
+bash scripts/smoke_compose.sh
+```
+
+The script builds the images and starts PostgreSQL, FastAPI and Dagster with a unique project
+name, disposable volumes and no published host ports. It checks database readiness, the
+uninitialized-schema health response, schema initialization, healthy empty reports/series,
+packaged CSS/JS/fonts, and Dagster definitions plus the running webserver's code location.
+It never ingests Energinet data or enables the schedule. Cleanup removes only this disposable
+project's containers, network and volumes, including after failure or interruption; existing
+development volumes and local databases are untouched. Image/dependency downloads still need
+network access on a cold build. GitHub Actions runs this separately from PostgreSQL integration tests.
+
+`/health` returns 200 only when the database is reachable and required reporting columns exist.
+It returns 503 with `schema: not_ready` before initialization, or `database: unavailable` for
+database failures. This checks connectivity and readable schema, not migrations, write access,
+data freshness, completeness or full operational readiness.
+
+Local verification on 2026-10-12: 58 tests passed against disposable PostgreSQL; Ruff passed.
+The Compose smoke test exited 2 because Docker Engine was unavailable, so image build and
+container startup remain unverified locally. See [verification details](docs/VERIFICATION.md).
+
 ## Intentional boundaries
 
 - One public source and five-minute dataset; no forecasting or machine learning.
@@ -84,7 +110,10 @@ Create `grid_test` first, e.g. `docker compose exec db createdb -U grid grid_tes
 - Dagster's `dev` server is appropriate locally. Production deployment needs separate daemon/webserver services, authentication, backups, secrets and monitoring.
 - API is read-only and local by default; do not expose unauthenticated run errors/raw paths publicly.
 
-Dependencies used for verification are recorded in `requirements.lock.txt` (Python 3.11). Regenerate deliberately when upgrading; `pyproject.toml` defines compatible ranges.
+Python **3.11** is the supported minor version for local development, Docker and CI
+(`>=3.11,<3.12` in package metadata). Dependencies are pinned in `requirements.lock.txt`.
+Regenerate and verify deliberately before changing the supported minor version. Image tags
+and the CI runner are not digest-pinned; this is repeatable smoke coverage, not a bit-identical build.
 
 ### Docker-free local demo (optional)
 

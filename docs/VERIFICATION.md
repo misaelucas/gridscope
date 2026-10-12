@@ -1,5 +1,57 @@
 # GridScope — Verification — 2026-10-12
 
+## Compose delivery and readiness — 2026-10-12
+
+Executed with Python 3.11.2 and Docker Compose v2.40.3:
+
+- `bash -n scripts/smoke_compose.sh`: passed.
+- `docker compose config --quiet`: passed.
+- Merged base/temporary smoke override inspected using `docker compose ... config --format json`:
+  no published ports, all three volume names prefixed with the disposable project name, and
+  build context resolved to this checkout. This configuration check does not require an Engine.
+- Embedded smoke-check Python and GitHub Actions YAML parsed successfully.
+- A fake Docker executable simulated build failure: exit 17 was preserved, cleanup targeted
+  only the generated `gridscope-smoke-*` project, and its temporary override directory was removed.
+  This verifies shell failure handling, not real Docker lifecycle behavior.
+- `.venv/bin/pytest -q`: 49 passed, 9 database tests skipped, 1 warning in 0.77s.
+- Full `.venv/bin/pytest -q`, with `GRID_TEST_DATABASE=1` and `DATABASE_URL` pointing at a new
+  temporary pgserver PostgreSQL instance: **58 passed, 1 warning in 1.42s**. The server was stopped
+  and its temporary directory removed afterward. Existing demo/development databases were untouched.
+- Before initializing that temporary database, `TestClient(app).get('/health')` returned the
+  expected 503 JSON with `database: ok` and `schema: not_ready`. Integration tests also verified
+  the initialized-schema 200 response. Unit tests cover missing columns and connection failures
+  without exposing exception details.
+- `.venv/bin/ruff check .`: All checks passed.
+- `docker info --format '{{.ServerVersion}}'`: failed because `/var/run/docker.sock` was absent.
+- `bash scripts/smoke_compose.sh`: **exit 2**, `Docker Engine is unavailable; smoke checks did not run.`
+
+The remaining warning is the existing Starlette/httpx TestClient deprecation. The Dockerfile,
+CI and package metadata now consistently support Python 3.11. The existing PostgreSQL CI job
+is preserved; a separate Compose smoke job was added. Remote GitHub Actions has not been run.
+Image builds, actual container startup, in-container assets/health checks, Dagster gRPC validation
+and its running webserver code location remain **unverified** until the smoke script runs with
+a working Engine. No live ingestion or daily schedule activation was performed.
+
+Reproduce the disposable local PostgreSQL run (requires the optional installed `pgserver`):
+
+```bash
+.venv/bin/python - <<'PY'
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import pgserver
+
+with tempfile.TemporaryDirectory(prefix='gridscope-test-') as directory:
+    server = pgserver.get_server(Path(directory) / 'postgres')
+    try:
+        environment = dict(os.environ, DATABASE_URL=server.get_uri(), GRID_TEST_DATABASE='1')
+        subprocess.run(['.venv/bin/pytest', '-q'], env=environment, check=True)
+    finally:
+        server.cleanup()
+PY
+```
+
 ## Version-control preparation — 2026-10-12
 
 - `.venv/bin/pytest -q tests/test_definitions.py tests/test_domain.py tests/test_source.py`: 20 passed in 0.50s.

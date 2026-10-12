@@ -73,6 +73,12 @@ def test_api_validation():
     assert client.get("/").status_code == 200
 
 
+def test_health_with_initialized_database():
+    response = TestClient(app).get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "database": "ok", "schema": "ready"}
+
+
 def test_valid_first_row_invalid_second_row_never_partially_writes():
     records = [
         {"Minutes5UTC": "2026-10-09T22:00:00", "PriceArea": "DK1", "CO2Emission": 80},
